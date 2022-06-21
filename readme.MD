@@ -18,11 +18,12 @@ This approach speeds up the learning process significantly compared to the Deep 
 
 There are 4 steps to a MTCS algorithm.
 
-1. **Setup**. Start in the root of the tree (i.e. the state of the board) and pick a child node (i.e. play a move). To pick a child node, use the upper confident bound and use the following expression to identify which nodes have the most expected reward.
+1. **Setup**. Start in the root of the tree (i.e. the state of the board) and assign large random upper confidence bound (UCB) values to each unvisited child node. 
+
+2. **Selection**. To pick a child node, use the following expression to identify which nodes have the most expected reward.
 
     $w/n + c * \sqrt{ln(N)/n}$, where: 
     
     $w$ = number of wins, $n$ = number of times the node is visited, $N$ = number of times the parent node is visited, $c$ = exploration/exploitation factor.
 
-    The above expression is known as the UCB (upper confidence bound) function and is used to select the next move (node) for the game: The node with the highest UCB is selected.
-2. 
+    The above expression is the UCB function and is used to select the next move (node) for the game: the node with the highest UCB is selected.
