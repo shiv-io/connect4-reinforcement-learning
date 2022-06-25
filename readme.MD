@@ -22,11 +22,11 @@ The Q-learning approach may sound reasonable for a game with not many variants, 
 
 ### Deep Q-learning
 
-#https://www.analyticsvidhya.com/blog/2019/04/introduction-deep-q-learning-python/
 
 In deep Q-learning, we use a neural network to approximate the Q-value functions. The state of the environment is passed as the input to the network as neurons and the Q-value of all possible actions is generated as the output. Please consider the diagram below for a comparison of Q-learning and Deep Q-learning
 
 ![](https://github.com/shiv-io/connect4-reinforcement-learning/blob/master/QlearningVDeep.png?raw=true)
+*Source: [AnalyticsVidhya](https://www.analyticsvidhya.com/blog/2019/04/introduction-deep-q-learning-python/)
 
 To train a deep Q-learning neural network, we feed all the observation-action pairs seen during an episode (a game) and calculate a loss based on the sum of rewards for that episode. For example, if winning a game of connect-4 gives a reward of 20, and a game was won in 7 steps, then the network will have 7 data points to train with, and the expected output for the "best" move should be 20, while for the rest it should be 0 (at least for that given training sample).
 
