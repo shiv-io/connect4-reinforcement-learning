@@ -26,7 +26,7 @@ The Q-learning approach may sound reasonable for a game with not many variants, 
 
 In deep Q-learning, we use a neural network to approximate the Q-value functions. The state of the environment is passed as the input to the network as neurons and the Q-value of all possible actions is generated as the output. Please consider the diagram below for a comparison of Q-learning and Deep Q-learning
 
-// add link of qlearning picture from github URL
+![](https://github.com/shiv-io/connect4-reinforcement-learning/blob/master/QlearningVDeep.png?raw=true)
 
 To train a deep Q-learning neural network, we feed all the observation-action pairs seen during an episode (a game) and calculate a loss based on the sum of rewards for that episode. For example, if winning a game of connect-4 gives a reward of 20, and a game was won in 7 steps, then the network will have 7 data points to train with, and the expected output for the "best" move should be 20, while for the rest it should be 0 (at least for that given training sample).
 
@@ -57,7 +57,7 @@ During the development of the solution, we tested different architectures of the
 
 We compared the 4 options by trying them during 1000 games against Kaggle's opponent with random choices, and we analyzed the evolution of the winning rate during this period. We also verified that the 4 configurations took similar times to run and train.
 
-// results image
+![](https://github.com/shiv-io/connect4-reinforcement-learning/blob/master/winrate.png?raw=true)
 
 As shown in the plot, the 4 configurations seem to be comparable in terms of learning efficiency. For the purpose of this study, we decide to keep the experiment 3 as the best one, since it seems to be the one with the steadier improvement over time.
 
