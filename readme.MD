@@ -34,11 +34,39 @@ If we repeat these calculations with thousands or millions of episodes, eventual
 
 Of course, we will need to combine this algorithm with an explore-exploit selector so we also give the agent the chance to try out new plays every now and then, and expand the lookup space. For that, we will set an **epsilon-greedy policy** that selects a random action with probability 1-epsilon and selects the action recommended by the network's output with a probability of epsilon. The idea is to reduce this epsilon parameter over time so the agent starts the learning with plenty of exploration and slowly shifts to mostly exploitation as the predictions become more trustable.
 
+```python
+#Define epsilon decision function
+
+def epsilonDecision(epsilon):
+  action_decision = random.choices(['model','random'], weights = [1 - epsilon, epsilon])[0]
+  return action_decision
+
+epsilonDecision(epsilon = 0) # would always give 'model'
+```
+
 ### Connect 4 Kaggle Environment
 
 By now we have established that we will build a neural network that learns from many state-action-reward sets. So, we need to interact with an environment that will provide us with that information after each play the agent makes. In other words, we need to have an opponent that will allow the network understand if a move (or game) was played well (resulting winning) or bad (resulting in losing). For that we will take advantage of a Connect-4 environment made available by Kaggle for a past Reinforcement Learning competition.
 
+```python
+from kaggle_environments import evaluate, make, utils
+import gym
+
+env = make("connectx", debug=True)
+env.render()
+
+#Creates a new random trainer
+trainer = env.train([None, 'negamax'])
+
+#Resets the board, shows initial state of all 0
+trainer.reset()['board']
+
+#Make a new action: play position 4
+new_obs, winner, state, info = trainer.step(4)
+```
+
 Every time we interact with this environment, we can pass an action as input to the game. After that, the opponent will respond with another action, and we will receive a description of the current state of the board, as well as information whether the game has ended and who is the winner. As long as we store this information after every play, we will keep on gathering new data for the deep q-learning network to continue improving. 
+
 
 
 ### Experimenting with the neural network
@@ -59,7 +87,7 @@ We compared the 4 options by trying them during 1000 games against Kaggle's oppo
 
 ![](https://github.com/shiv-io/connect4-reinforcement-learning/blob/master/winrate.png?raw=true)
 
-As shown in the plot, the 4 configurations seem to be comparable in terms of learning efficiency. For the purpose of this study, we decide to keep the experiment 3 as the best one, since it seems to be the one with the steadier improvement over time.
+As shown in the plot, the 4 configurations seem to be comparable in terms of learning efficiency. All of them reach win rates of around 75%-80% after 1000 games played against a randomly-controlled opponent. For the purpose of this study, we decide to keep the experiment 3 as the best one, since it seems to be the one with the steadier improvement over time.
 
 ### The Code
 
