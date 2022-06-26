@@ -91,8 +91,208 @@ As shown in the plot, the 4 configurations seem to be comparable in terms of lea
 
 ### The Code
 
-explain code + snippets
+#### Creating the Deep Learning Model
 
+The first step in creating the Deep Learning model is to set the input and output dimensions. There are 7 different columns on the Connect 4 grid, so we set num_actions to 7. We set the input shape to [6,7] and reshape the Kaggle environment output in order to have an easier time visualizing the board state and debugging.
+
+```
+#Number of possible actions
+num_actions = 7
+#Number of different states
+num_states = [6,7]
+```
+
+The next step is creating the models itself. For this we are using the TensorFlow Functional API. Note that while the structure and specifics of the model will have a large impact on its performance, we did not have time to optimize settings and hyperparameters. Each layers uses a ReLu activation function except for the last, which uses the linear function. This is based on the results of the experiment above.
+
+```
+# Create the DQN
+
+input = tf.keras.layers.Input(shape = (num_slots))
+flatten = tf.keras.layers.Flatten()(input)
+hidden_1 = tf.keras.layers.Dense(50, activation = 'relu')(flatten)
+hidden_2 = tf.keras.layers.Dense(50, activation = 'relu')(hidden_1)
+hidden_3 = tf.keras.layers.Dense(50, activation = 'relu')(hidden_2)
+hidden_4 = tf.keras.layers.Dense(50, activation = 'relu')(hidden_3)
+
+output = tf.keras.layers.Dense(num_actions, activation = "linear")(hidden_4) 
+
+model = tf.keras.models.Model(inputs = [input], outputs = [output])
+```
+
+#### Creating Needed Functions
+
+We now have to create several functions needed to train the DQN. The first of these, getAction, uses the epsilon decision policy to get an action and subsequent predictions. The model predictions are passed through a softmax activation function before being returned.
+
+```
+def getAction(model, observation, epsilon):
+  #Get the action based on greedy epsilon policy
+  action_decision = epsilonDecision(epsilon)
+  #Reshape the observation to fit in model
+  observation = np.array([observation])
+  #Get predictions
+  preds = model.predict(observation)
+  #Get the softmax activation of the logits
+  weights = tf.nn.softmax(preds).numpy()[0]
+
+  if action_decision == 'model':
+    action = np.argmax(weights)
+  if action_decision == 'random':
+    action = random.randint(0,6)
+
+  return int(action), weights 
+  
+```
+
+The model needs to be able to access the history of the past game in order to learn which set of actions are beneficial and which are harmful. This is why we create the Experience class to store past observations, actions and rewards. The class has two functions: clear(), which is simply used to clear the lists used as memory, and store_experience, which is used to add new data to storage. Note that this is not an optimal way of storing data for the model to learn from, and would certainly run into efficiency issues if the model was trained for a significant length of time.
+
+```
+class Experience:
+  def __init__(self):
+    self.clear() 
+  
+  def clear(self):
+    self.observations = []
+    self.actions = []
+    self.rewards = []
+  
+  def store_experience(self, new_obs, new_act, new_reward):
+    self.observations.append(new_obs)
+    self.actions.append(new_act)
+    self.rewards.append(new_reward)
+```    
+
+The next function is used to cover up a potential flaw with the Kaggle Connect4 environment. It is possible, and even fairly likely, for a column to be filled to the top during a game. Placing another piece in that column would be invalid, however the environment still allows you to attempt to do so. We therefore have to check if an action is valid before letting it take place.
+
+This is done by checking if the first row of our reshaped list format has a slot open in the desired column. If it doesn't, another action is chosen randomly. There are most likely better ways to do this, however the model should learn to avoid invalid actions over time since they result in worse games.
+
+```
+# Check if action is valid
+# #Requires reshape(6,7) format
+def checkValid(obs, action):
+  valid_actions = set([0,1,2,3,4,5,6])
+
+  if obs[0,action] != 0:
+    valid_actions = valid_actions - set([action])
+    action = random.choice(list(valid_actions))
+
+  return action
+```
+
+Rewards also have to be defined and given. This is done through the getReward() function, which uses the information about the state of the game and the winner returned by the Kaggle environment. Four different possible outcomes are defined in this function. The first checks if the game is done, and the second and third assign a reward based on the winner. The final outcome checks if the game is finished with no winner, which occurs surprisingly often. We set the reward of a tie to be the same as a loss, since the goal is to maximize the win rate. Note that we were not able to optimize the reward values.
+
+```
+#Function to get reward
+def getReward(winner, state):
+  #Game not done wet
+  if not state:
+    reward = 0
+  if state: 
+    #If player 1 wins
+    if winner == 1:
+      reward = 50
+    #If player 2 wins
+    if winner == -1:
+      reward = -50
+    if winner == 0:
+      reward = -50
+  
+  return reward
+```
+
+The final function uses TensorFlow's GradientTape function to back propagate through the model and compute loss based on rewards. Weights are computed by the model using every observation from a game, and softmax cross entropy is then performed between the set of actions and weights. Finally, we reduce the product of the cross entropy values and the rewards to a single value: model loss.
+
+```
+def train_step(model, optimizer, observations, actions, rewards):
+    
+    with tf.GradientTape() as tape:
+      #Propagate through the agent network
+        
+        logits = model(observations)
+        softmax_cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits, labels=actions)
+        loss = tf.reduce_mean(softmax_cross_entropy * rewards)
+        grads = tape.gradient(loss, model.trainable_variables)
+        
+        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+```
+
+#### Training the model
+
+We are now finally ready to train the Deep Q Learning Network. To do so we must first create the environment, define an optimizer (in our case Adam), initialize an Experience object, and set our initial epsilon value and its decay rate. We are then ready to start looping through the episodes. In our case, each episode is one game. Note that we use TQDM to track the progress of the training. TQDM may not work with certain notebook environments, and is not required.
+
+Each episode begins by setting up a trainer to act as player 2. We trained the model using a random trainer, which means that every action taken by player 2 is random. This was done for the sake of speed, and would not create an agent capable of beating a human player. In the ideal situation, we would have begun by training against a random agent, then pitted our agent against the Kaggle negamax agent, and finally introduced a second DQN agent for self-play. The Kaggle environment is not ideal for self-play, however, and training in this fashion would have taken too long.
+
+After creating player 2 we get the first observation from the board and clear the experience cache. We can then begin looping through actions in order to play the games. The first step is to get an action and then check if the it is valid. Once we have a valid action, we play it using trainer.step() and retrieve new data about the board, the state of the game and the reward. Most rewards will be 0, since most actions do not end the game. The final while loop checks if the game is finished. If it is, we can train our agent using the train_step() function and play the next game.
+
+```
+#Train P1 (model) against random agent P2
+
+#Create the environment
+env = make("connectx", debug=True)
+
+#Optimizer
+optimizer = tf.keras.optimizers.Adam()
+
+#Set up the experience storage
+exp = Experience()
+
+epsilon = 1
+epsilon_rate = 0.995
+
+wins = 0
+win_track = []
+
+for episode in tqdm.tqdm(range(10000)):
+
+  #Set up random trainer
+  trainer = env.train([None, 'random'])
+
+  #First observation
+  obs = np.array(trainer.reset()['board']).reshape(6,7)
+  #Clear cache
+  exp.clear()
+  #Decrease epsilon over time if we want
+  epsilon = epsilon * epsilon_rate
+  
+  #Set initial state
+  state = False
+
+  while not state:
+
+    #Get action
+    action, w = getAction(model, obs, epsilon)
+    
+    #Check if action is valid
+    while True:
+      temp_action = action
+      action = checkValid(obs, temp_action)
+      if temp_action == action:
+        break
+
+    #Play the action and retrieve info
+    new_obs, winner, state, info = trainer.step(action)
+    obs = np.array(new_obs['board']).reshape(6,7)
+
+    #Get reward
+    reward = getReward(winner, state)
+
+
+    #Store experience
+    exp.store_experience(obs, action, reward)
+
+    #Break if game is over
+    if state:
+      #This would be where training step goes I think
+
+      if winner == 1:
+        wins += 1
+      win_track.append(wins)
+
+      train_step(model2, optimizer = optimizer,
+                 observations = np.array(exp.observations),
+                 actions = np.array(exp.actions),
+                 rewards = exp.rewards)
+      break
+```
 ## Monte Carlo Tree Search
 
 This approach speeds up the learning process significantly compared to the Deep Q Learning approach. Monte Carlo Tree Search (MCTS) excels in situations where the action space is vast. In the case of Connect 4, the action space is 7. As such, to solve Connect 4 with reinforcement learning, a large number of permutations and combinations of the board must be considered.
