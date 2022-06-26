@@ -95,7 +95,7 @@ As shown in the plot, the 4 configurations seem to be comparable in terms of lea
 
 The first step in creating the Deep Learning model is to set the input and output dimensions. There are 7 different columns on the Connect 4 grid, so we set num_actions to 7. We set the input shape to [6,7] and reshape the Kaggle environment output in order to have an easier time visualizing the board state and debugging.
 
-```
+```python
 #Number of possible actions
 num_actions = 7
 #Number of different states
@@ -104,7 +104,7 @@ num_states = [6,7]
 
 The next step is creating the models itself. For this we are using the TensorFlow Functional API. Note that while the structure and specifics of the model will have a large impact on its performance, we did not have time to optimize settings and hyperparameters. Each layers uses a ReLu activation function except for the last, which uses the linear function. This is based on the results of the experiment above.
 
-```
+```python
 # Create the DQN
 
 input = tf.keras.layers.Input(shape = (num_slots))
@@ -123,7 +123,7 @@ model = tf.keras.models.Model(inputs = [input], outputs = [output])
 
 We now have to create several functions needed to train the DQN. The first of these, getAction, uses the epsilon decision policy to get an action and subsequent predictions. The model predictions are passed through a softmax activation function before being returned.
 
-```
+```python
 def getAction(model, observation, epsilon):
   #Get the action based on greedy epsilon policy
   action_decision = epsilonDecision(epsilon)
@@ -145,7 +145,7 @@ def getAction(model, observation, epsilon):
 
 The model needs to be able to access the history of the past game in order to learn which set of actions are beneficial and which are harmful. This is why we create the Experience class to store past observations, actions and rewards. The class has two functions: clear(), which is simply used to clear the lists used as memory, and store_experience, which is used to add new data to storage. Note that this is not an optimal way of storing data for the model to learn from, and would certainly run into efficiency issues if the model was trained for a significant length of time.
 
-```
+```python
 class Experience:
   def __init__(self):
     self.clear() 
@@ -165,7 +165,7 @@ The next function is used to cover up a potential flaw with the Kaggle Connect4 
 
 This is done by checking if the first row of our reshaped list format has a slot open in the desired column. If it doesn't, another action is chosen randomly. There are most likely better ways to do this, however the model should learn to avoid invalid actions over time since they result in worse games.
 
-```
+```python
 # Check if action is valid
 # #Requires reshape(6,7) format
 def checkValid(obs, action):
@@ -180,7 +180,7 @@ def checkValid(obs, action):
 
 Rewards also have to be defined and given. This is done through the getReward() function, which uses the information about the state of the game and the winner returned by the Kaggle environment. Four different possible outcomes are defined in this function. The first checks if the game is done, and the second and third assign a reward based on the winner. The final outcome checks if the game is finished with no winner, which occurs surprisingly often. We set the reward of a tie to be the same as a loss, since the goal is to maximize the win rate. Note that we were not able to optimize the reward values.
 
-```
+```python
 #Function to get reward
 def getReward(winner, state):
   #Game not done wet
@@ -201,7 +201,7 @@ def getReward(winner, state):
 
 The final function uses TensorFlow's GradientTape function to back propagate through the model and compute loss based on rewards. Weights are computed by the model using every observation from a game, and softmax cross entropy is then performed between the set of actions and weights. Finally, we reduce the product of the cross entropy values and the rewards to a single value: model loss.
 
-```
+```python
 def train_step(model, optimizer, observations, actions, rewards):
     
     with tf.GradientTape() as tape:
@@ -223,7 +223,7 @@ Each episode begins by setting up a trainer to act as player 2. We trained the m
 
 After creating player 2 we get the first observation from the board and clear the experience cache. We can then begin looping through actions in order to play the games. The first step is to get an action and then check if the it is valid. Once we have a valid action, we play it using trainer.step() and retrieve new data about the board, the state of the game and the reward. Most rewards will be 0, since most actions do not end the game. The final while loop checks if the game is finished. If it is, we can train our agent using the train_step() function and play the next game.
 
-```
+```python
 #Train P1 (model) against random agent P2
 
 #Create the environment
